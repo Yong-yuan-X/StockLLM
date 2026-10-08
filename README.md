@@ -1,21 +1,12 @@
 # StockLLM
 
-StockLLM 是一个面向 A 股场景的本地化股票分析与报告生成系统。项目将行情获取、板块查询、舆情聚合、规则分析、LLM 报告生成、报告投递与社区互动整合到同一个 Flask 应用中
+StockLLM 是一个面向 A 股场景的本地化股票分析与报告生成系统。项目将行情获取、板块查询、舆情聚合、规则分析、LLM 报告生成、报告投递与社区互动整合到同一个应用中
 
 ## 项目概览
 
 当前项目主链路如下：
 
 `行情/指数数据获取 -> 历史数据缓存 -> 多指标分析与融合 -> 舆情聚合与去重 -> LLM 报告生成 -> HTML 预览/邮件发送/历史存档`
-
-除了分析能力外，项目还包含：
-
-- 用户注册、登录、邮箱验证码校验
-- 自选股管理
-- 大盘指数与个股图表展示
-- 板块成分股查询
-- 论坛发帖、评论、点赞、图片上传
-- 管理员用户查看与注销
 
 
 <img width="1448" height="1086" alt="img_v3_02169_9a544a70-5335-4efc-90b9-3893320b72cg" src="https://github.com/user-attachments/assets/04dead1a-a931-41b2-a81d-a75447df332f" />
@@ -74,22 +65,6 @@ python app.py
 默认启动地址：
 
 - `http://127.0.0.1:5001`
-
-## 运行时目录
-
-应用启动时会自动创建以下目录：
-
-- `runtime/cache/api`
-- `runtime/cache/market_index`
-- `runtime/cache/sentiment`
-- `runtime/cache/stock_history`
-- `runtime/cache/reports`
-- `runtime/forum_uploads`
-- `runtime/user_avatars`
-
-数据库文件默认位于项目根目录：
-
-- `stock.db`
 
 ## 配置说明
 
