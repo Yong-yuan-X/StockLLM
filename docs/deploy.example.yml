@@ -1,0 +1,166 @@
+# Inactive example: files outside .github/workflows are not executed by GitHub Actions.
+# Copy this file into .github/workflows only after reviewing it and configuring a
+# protected production Environment with the documented variables and secrets.
+name: StockLLM deployment example
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stockllm-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image
+        id: image
+        env:
+          IMAGE_REPOSITORY: ${{ vars.APP_IMAGE_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          : "${IMAGE_REPOSITORY:?Missing APP_IMAGE_REPOSITORY production variable}"
+          IMAGE="$IMAGE_REPOSITORY"
+          echo "name=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "tag=$IMAGE:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "latest=$IMAGE:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Login to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.CONTAINER_REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.tag }}
+            ${{ steps.image.outputs.latest }}
+          cache-from: |
+            type=gha
+          cache-to: |
+            type=gha,mode=max
+
+      - name: Verify pushed image
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "${{ steps.image.outputs.latest }}"
+
+      - name: Prepare SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${SERVER_KNOWN_HOSTS:?Missing SERVER_KNOWN_HOSTS production secret}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/server_key
+          chmod 600 ~/.ssh/server_key
+          printf '%s\n' "$SERVER_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Package deploy files
+        run: |
+          set -euo pipefail
+          tar -czf /tmp/stockllm-deploy.tar.gz docker-compose.yml docker .env.example
+
+      - name: Upload
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/server_key -P "${SERVER_PORT:-22}" /tmp/stockllm-deploy.tar.gz "$SERVER_USER@$SERVER_HOST:/tmp/stockllm-deploy.tar.gz"
+
+      - name: Deploy
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          CONTAINER_REGISTRY: ${{ vars.CONTAINER_REGISTRY }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          APP_IMAGE: ${{ steps.image.outputs.latest }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_PATH:?Missing DEPLOY_PATH repository secret}"
+          : "${CONTAINER_REGISTRY:?Missing CONTAINER_REGISTRY production variable}"
+          echo "Deploying image: $APP_IMAGE"
+          REGISTRY_USERNAME_B64="$(printf '%s' "$REGISTRY_USERNAME" | base64 -w 0)"
+          REGISTRY_PASSWORD_B64="$(printf '%s' "$REGISTRY_PASSWORD" | base64 -w 0)"
+          echo "::add-mask::$REGISTRY_USERNAME_B64"
+          echo "::add-mask::$REGISTRY_PASSWORD_B64"
+          ssh -i ~/.ssh/server_key -p "${SERVER_PORT:-22}" "$SERVER_USER@$SERVER_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' APP_IMAGE='$APP_IMAGE' CONTAINER_REGISTRY='$CONTAINER_REGISTRY' REGISTRY_USERNAME_B64='$REGISTRY_USERNAME_B64' REGISTRY_PASSWORD_B64='$REGISTRY_PASSWORD_B64' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          APP_DIR="$DEPLOY_PATH/app"
+          SHARED_DIR="$DEPLOY_PATH/shared"
+          REGISTRY_USERNAME="$(printf '%s' "$REGISTRY_USERNAME_B64" | base64 -d)"
+          REGISTRY_PASSWORD="$(printf '%s' "$REGISTRY_PASSWORD_B64" | base64 -d)"
+
+          mkdir -p "$APP_DIR" "$SHARED_DIR/runtime" "$SHARED_DIR/certs"
+          touch "$SHARED_DIR/stock.db"
+
+          tar -xzf /tmp/stockllm-deploy.tar.gz -C "$APP_DIR"
+          rm -f /tmp/stockllm-deploy.tar.gz
+
+          if [ ! -f "$SHARED_DIR/.env" ]; then
+            cp "$APP_DIR/.env.example" "$SHARED_DIR/.env"
+            echo "Created $SHARED_DIR/.env. Fill it on the server, then rerun this workflow."
+            exit 1
+          fi
+
+          ln -sfn "$SHARED_DIR/.env" "$APP_DIR/.env"
+          if grep -q '^APP_IMAGE=' "$SHARED_DIR/.env"; then
+            sed -i "s|^APP_IMAGE=.*|APP_IMAGE=$APP_IMAGE|" "$SHARED_DIR/.env"
+          else
+            printf '\nAPP_IMAGE=%s\n' "$APP_IMAGE" >> "$SHARED_DIR/.env"
+          fi
+          if grep -q '^HOST_RUNTIME_DIR=' "$SHARED_DIR/.env"; then
+            sed -i "s|^HOST_RUNTIME_DIR=.*|HOST_RUNTIME_DIR=$SHARED_DIR/runtime|" "$SHARED_DIR/.env"
+          else
+            printf 'HOST_RUNTIME_DIR=%s/runtime\n' "$SHARED_DIR" >> "$SHARED_DIR/.env"
+          fi
+          if grep -q '^HOST_DATABASE_PATH=' "$SHARED_DIR/.env"; then
+            sed -i "s|^HOST_DATABASE_PATH=.*|HOST_DATABASE_PATH=$SHARED_DIR/stock.db|" "$SHARED_DIR/.env"
+          else
+            printf 'HOST_DATABASE_PATH=%s/stock.db\n' "$SHARED_DIR" >> "$SHARED_DIR/.env"
+          fi
+          if grep -q '^HOST_CERT_DIR=' "$SHARED_DIR/.env"; then
+            sed -i "s|^HOST_CERT_DIR=.*|HOST_CERT_DIR=$SHARED_DIR/certs|" "$SHARED_DIR/.env"
+          else
+            printf 'HOST_CERT_DIR=%s/certs\n' "$SHARED_DIR" >> "$SHARED_DIR/.env"
+          fi
+
+          cd "$APP_DIR"
+          DOCKER_CMD="docker"
+          if ! docker info >/dev/null 2>&1; then
+            DOCKER_CMD="sudo docker"
+          fi
+
+          printf '%s' "$REGISTRY_PASSWORD" | $DOCKER_CMD login "$CONTAINER_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
+          APP_IMAGE="$APP_IMAGE" $DOCKER_CMD compose --env-file "$SHARED_DIR/.env" pull
+          APP_IMAGE="$APP_IMAGE" $DOCKER_CMD compose --env-file "$SHARED_DIR/.env" up -d --no-build
+          APP_IMAGE="$APP_IMAGE" $DOCKER_CMD compose ps
+          REMOTE

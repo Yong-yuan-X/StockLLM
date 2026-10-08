@@ -1,0 +1,9 @@
+Flask
+python-dotenv
+pandas
+requests
+akshare
+openai
+scikit-learn
+xgboost
+gunicorn

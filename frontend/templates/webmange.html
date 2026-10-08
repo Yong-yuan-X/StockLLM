@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockLLM - 股票分析与报告生成系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/webmange.css', v='20260504a') }}">
+</head>
+<body>
+    <div class="auth-overlay" id="authOverlay">
+        <div class="auth-card">
+            <div class="auth-badge">智能投研入口</div>
+            <div class="auth-card-head">
+                    <h1>StockLLM 股票分析与报告生成系统</h1>
+                <p id="authStatusText">登录后进入系统主页，查看行情、舆情与分析报告。</p>
+            </div>
+            <div class="auth-form">
+                <input type="text" id="authUsernameInput" placeholder="请输入账号/邮箱/UUID">
+                <input type="text" id="authEmailInput" placeholder="注册时请输入邮箱" style="display:none;">
+                <div class="auth-code-row" id="authCodeRow" style="display:none;">
+                    <input type="text" id="authEmailCodeInput" placeholder="请输入邮箱验证码">
+                    <button type="button" class="secondary-btn" id="sendEmailCodeBtn">获取验证码</button>
+                </div>
+                <input type="password" id="authPasswordInput" placeholder="请输入密码">
+                <div class="auth-action-row">
+                    <button type="button" id="authSubmitBtn">立即登录</button>
+                    <button type="button" class="auth-switch-btn" id="authSwitchBtn">注册</button>
+                </div>
+                <button type="button" class="auth-forgot-btn" id="authForgotBtn">忘记密码</button>
+            </div>
+            <div class="settings-status" id="authStatus"></div>
+        </div>
+    </div>
+
+    <div class="page">
+        <aside class="sidebar">
+            <div class="sidebar-main">
+                <div class="brand">StockLLM 股票分析与报告生成系统</div>
+                <div class="sidebar-user-card" id="sidebarUserCard">
+                    <div class="sidebar-user-profile">
+                        <div class="sidebar-user-avatar" id="sidebarUserAvatar">--</div>
+                        <div>
+                            <div class="sidebar-user-name" id="sidebarUsername">未登录</div>
+                            <div class="sidebar-user-meta" id="sidebarUserMeta">UUID --</div>
+                        </div>
+                    </div>
+                    <button type="button" class="sidebar-logout-btn" id="logoutBtn">退出登录</button>
+                </div>
+                <div class="menu">
+                    <button class="menu-item active" data-panel="marketPanel">大盘指数</button>
+                    <button class="menu-item" data-panel="sectorPanel">板块分析</button>
+                    <button class="menu-item menu-parent" id="stockMenuToggle" type="button" aria-expanded="false">个股分析</button>
+                    <div class="submenu" id="stockSubmenu">
+                        <button class="submenu-item" type="button" data-stock-mode="market">个股行情</button>
+                        <button class="submenu-item" type="button" data-stock-mode="report">个股分析报告生成</button>
+                    </div>
+                    <button class="menu-item" data-panel="sentimentPanel">舆情分析</button>
+                    <button class="menu-item" data-panel="modelInfoPanel">模型说明</button>
+                    <button class="menu-item" data-panel="aiCustodyPanel">AI托管</button>
+                    <button class="menu-item" data-panel="historyReportPanel">历史报告</button>
+                    <button class="menu-item" data-panel="forumPanel">论坛</button>
+                    <button class="menu-item" data-panel="settingsPanel">设置</button>
+                    <button class="menu-item" id="userManageMenuItem" data-panel="userManagePanel" style="display:none;">用户管理</button>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <div class="sidebar-clock" id="sidebarClock" aria-live="polite">
+                    <div class="sidebar-clock-label">当前时间</div>
+                    <div class="sidebar-clock-time" id="sidebarClockTime">00:00:00</div>
+                </div>
+                <button class="theme-toggle" id="themeToggleBtn" type="button" aria-pressed="false">
+                    <span class="theme-toggle-label">夜间模式</span>
+                    <span class="theme-toggle-track">
+                        <span class="theme-toggle-thumb"></span>
+                    </span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <section class="panel active" id="marketPanel">
+                <div class="content-card">
+                    <h1>大盘指数</h1>
+                    <div class="data-card market-overview">
+                        <div class="market-toolbar">
+                            <div>
+                                <h2 class="section-title">A股大盘指数</h2>
+                                <p class="market-meta" id="marketMeta">准备加载大盘指数数据...</p>
+                            </div>
+                            <div class="toolbar-actions">
+                                <label class="refresh-control" for="marketRefreshInterval">
+                                    <span>自动刷新</span>
+                                    <select id="marketRefreshInterval">
+                                        <option value="10">10秒</option>
+                                        <option value="20">20秒</option>
+                                        <option value="30" selected>30秒</option>
+                                        <option value="40">40秒</option>
+                                        <option value="50">50秒</option>
+                                        <option value="60">60秒</option>
+                                    </select>
+                                </label>
+                                <button class="market-reload-btn" id="reloadMarketBtn">刷新指数</button>
+                            </div>
+                        </div>
+                        <div id="marketStatus" class="market-loading">正在获取大盘指数数据...</div>
+                        <div class="index-cards" id="indexCards" style="display:none;"></div>
+                        <div class="market-primary-grid" id="marketPrimaryGrid" style="display:none;">
+                            <div class="chart-card market-chart-card" id="marketChartCard" style="display:none;">
+                                <div class="chart-head">
+                                    <div>
+                                        <h3 class="chart-title" id="chartTitle">大盘指数走势</h3>
+                                        <p class="chart-subtitle" id="chartSubtitle">最近 1 年指数连续走势</p>
+                                    </div>
+                                    <div class="chart-period-switch" id="chartPeriodSwitch" aria-label="大盘周期切换">
+                                        <button type="button" class="chart-period-btn active" data-range="365">1年</button>
+                                        <button type="button" class="chart-period-btn" data-range="90">3个月</button>
+                                        <button type="button" class="chart-period-btn" data-range="30">1个月</button>
+                                        <button type="button" class="chart-period-btn" data-range="1">当天</button>
+                                    </div>
+                                    <div class="chart-stats">
+                                        <div class="chart-latest" id="chartLatest">--</div>
+                                        <div class="chart-change" id="chartChange">--</div>
+                                    </div>
+                                </div>
+                                <div class="market-indicator-strip" id="marketIndicatorStrip"></div>
+                                <div class="market-ma-legend" id="marketMaLegend"></div>
+                                <div class="chart-shell" id="chartShell"></div>
+                                <div class="chart-axis-labels">
+                                    <span id="chartStartDate">--</span>
+                                    <span id="chartMinValue">最低 --</span>
+                                    <span id="chartMaxValue">最高 --</span>
+                                    <span id="chartEndDate">--</span>
+                                </div>
+                            </div>
+                            <div class="chart-card market-volume-card">
+                                <div class="chart-head compact">
+                                    <div>
+                                        <h3 class="chart-title">成交量柱状图</h3>
+                                        <p class="chart-subtitle">当前周期对应的指数成交量</p>
+                                    </div>
+                                </div>
+                                <div class="chart-shell" id="marketVolumeShell"></div>
+                            </div>
+                        </div>
+                        <div class="market-extra-grid" id="marketExtraGrid" style="display:none;">
+                            <div class="chart-card">
+                                <div class="chart-head compact">
+                                    <div>
+                                        <h3 class="chart-title">RSI 指标</h3>
+                                        <p class="chart-subtitle">观察市场短线强弱与超买超卖区间</p>
+                                    </div>
+                                </div>
+                                <div class="chart-shell" id="marketRsiShell"></div>
+                            </div>
+                            <div class="chart-card">
+                                <div class="chart-head compact">
+                                    <div>
+                                        <h3 class="chart-title">MACD 指标</h3>
+                                        <p class="chart-subtitle">观察动量变化与趋势拐点</p>
+                                    </div>
+                                </div>
+                                <div class="chart-shell" id="marketMacdShell"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="data-card market-analysis-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">大盘分析报告生成</h2>
+                            </div>
+                        </div>
+                        <div class="stock-panel-layout market-analysis-layout stacked-analysis-layout">
+                            <div class="stock-main-column">
+                                <div class="analysis-progress" id="marketAnalysisProgress" style="display:none;">
+                                    <div class="analysis-spinner"></div>
+                                    <div class="analysis-progress-text" id="marketAnalysisProgressText">正在生成大盘分析报告...</div>
+                                </div>
+                                <div class="predict-result" id="marketPredictResult">
+                                    <h4>大盘预测结果</h4>
+                                    <div id="marketPredictResultContent"></div>
+                                </div>
+                            </div>
+                            <div class="settings-card analysis-config-card">
+                                <div class="section-head">
+                                    <div>
+                                        <h2 class="section-title">分析设置</h2>
+                                    </div>
+                                </div>
+                                <div class="predict-menu-section">
+                                    <div class="predict-menu-title">分析标的</div>
+                                    <div class="settings-form">
+                                        <select id="marketAnalysisIndexSelect">
+                                            <option value="sh000001">上证指数</option>
+                                            <option value="sz399001">深证成指</option>
+                                            <option value="sz399006">创业板指</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="predict-menu-section">
+                                    <div class="predict-menu-title">预测周期</div>
+                                    <div class="predict-day-options">
+                                        <button type="button" class="predict-day-option market-predict-day-option active" data-days="1">1天</button>
+                                        <button type="button" class="predict-day-option market-predict-day-option" data-days="3">3天</button>
+                                        <button type="button" class="predict-day-option market-predict-day-option" data-days="7">7天</button>
+                                        <button type="button" class="predict-day-option market-predict-day-option" data-days="30">30天</button>
+                                        <button type="button" class="predict-day-option market-predict-day-option" data-days="60">60天</button>
+                                        <button type="button" class="predict-day-option market-predict-day-option" data-days="90">90天</button>
+                                        <button type="button" class="predict-day-option market-predict-day-option" data-days="120">120天</button>
+                                        <button type="button" class="predict-day-option market-predict-day-option" data-days="180">180天</button>
+                                        <div class="predict-custom-days inline">
+                                            <label for="marketPredictCustomDaysInput">自定义</label>
+                                            <input type="number" id="marketPredictCustomDaysInput" min="1" max="365" step="1" placeholder="1-365天">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="predict-menu-section">
+                                    <div class="predict-menu-title">启用算法</div>
+                                    <div class="analysis-switch-grid">
+                                        <label class="analysis-switch-row"><span>MA 均线</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="ma" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>RSI</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="rsi" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>MACD</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="macd" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>ARIMA</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="arima" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>XGBoost</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="xgboost" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>趋势判断</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="trend"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>Bollinger Bands</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="bollinger_bands"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>ADX</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="adx"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>波动率分类</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="volatility_classification"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>Random Forest</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="random_forest"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>线性回归</span><span class="analysis-switch"><input type="checkbox" class="market-predict-case-checkbox" value="linear_regression"><span class="analysis-switch-slider"></span></span></label>
+                                    </div>
+                                </div>
+                                <button type="button" class="predict-run-btn" id="marketPredictRunBtn">执行大盘分析</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="sectorPanel">
+                <div class="content-card">
+                    <h1>板块分析</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">板块成分股快照</h2>
+                                <p class="section-meta" id="sectorMeta">准备加载板块列表...</p>
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <input type="text" id="sectorPickerInput" list="sectorOptionsList" placeholder="请输入板块名搜索">
+                            <select id="sectorSelect" style="display:none;">
+                                <option value="">请选择板块</option>
+                            </select>
+                            <button id="sectorSearchBtn">查询板块</button>
+                            <button id="sectorResetBtn" class="secondary-btn">重置</button>
+                        </div>
+                        <div id="sectorStatus" class="market-loading">正在准备板块列表...</div>
+                        <div class="table-wrapper" id="sectorTableWrap" style="display:none;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>代码</th>
+                                        <th>名称</th>
+                                        <th>所属板块</th>
+                                        <th>市场</th>
+                                        <th>刷新时间</th>
+                                        <th>最新价</th>
+                                        <th>涨跌幅</th>
+                                        <th>涨跌额</th>
+                                        <th>成交量</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sectorBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="sectorPagination" style="display:none;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ====================== 个股行情 ====================== -->
+            <section class="panel" id="stockMarketPanel">
+                <div class="content-card stock-market-page-card">
+                    <h1>个股行情</h1>
+                    <div class="stock-panel-layout">
+                        <div class="stock-main-column">
+                            <div class="data-card">
+                                <div class="section-head">
+                                    <div>
+                                        <h2 class="section-title">个股行情</h2>
+                                        <p class="section-meta" id="stockDirectoryMeta">请输入一个或多个股票代码或名称，查询盘中实时行情。</p>
+                                    </div>
+                                    <label class="refresh-control" for="stockRefreshInterval">
+                                        <span>自动刷新</span>
+                                        <select id="stockRefreshInterval">
+                                            <option value="10">10秒</option>
+                                            <option value="20">20秒</option>
+                                            <option value="30" selected>30秒</option>
+                                            <option value="40">40秒</option>
+                                            <option value="50">50秒</option>
+                                            <option value="60">60秒</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <div class="filter-row">
+                                    <input type="text" id="stockSearchInput" placeholder="支持多支股票，空格/逗号/顿号分隔">
+                                    <select id="stockDirectoryFavoriteSelect">
+                                        <option value="">从自选股中选择</option>
+                                    </select>
+                                    <button id="stockSearchBtn">查询行情</button>
+                                </div>
+                                <div id="stockDirectoryStatus" class="market-loading">请输入一个或多个股票代码或名称后查询盘中实时行情。</div>
+                                <div class="table-wrapper" id="stockDirectoryTableWrap" style="display:none;">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>代码</th>
+                                                <th>名称</th>
+                                                <th>所属行业</th>
+                                                <th>市场</th>
+                                                <th>刷新时间</th>
+                                                <th>最新价</th>
+                                                <th>涨跌幅</th>
+                                                <th>涨跌额</th>
+                                                <th>换手率</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="stockDirectoryBody"></tbody>
+                                    </table>
+                                </div>
+                                <div class="pagination" id="stockDirectoryPagination" style="display:none;"></div>
+                                <div class="chart-card stock-chart-card" id="stockChartCard" style="display:none;">
+                                    <div class="chart-head">
+                                        <div>
+                                            <h3 class="chart-title" id="stockChartTitle">个股图表</h3>
+                                            <p class="chart-subtitle" id="stockChartSubtitle">基于近 90 个交易日真实历史数据绘制</p>
+                                        </div>
+                                        <div class="chart-period-switch" id="stockChartTypeSwitch" aria-label="个股图表切换">
+                                            <button type="button" class="stock-chart-type-btn active" data-chart-type="candlestick">K线图</button>
+                                            <button type="button" class="stock-chart-type-btn" data-chart-type="volume">成交量</button>
+                                            <button type="button" class="stock-chart-type-btn" data-chart-type="compare">相对大盘</button>
+                                        </div>
+                                        <div class="chart-period-switch" id="stockChartRangeSwitch" aria-label="个股图表周期切换">
+                                            <button type="button" class="stock-chart-range-btn active" data-range="365">1年</button>
+                                            <button type="button" class="stock-chart-range-btn" data-range="90">90天</button>
+                                            <button type="button" class="stock-chart-range-btn" data-range="30">30天</button>
+                                            <button type="button" class="stock-chart-range-btn" data-range="1">当天</button>
+                                        </div>
+                                        <div class="chart-stats">
+                                            <div class="chart-latest" id="stockChartLatest">--</div>
+                                            <div class="chart-change" id="stockChartChange">--</div>
+                                        </div>
+                                    </div>
+                                    <div class="chart-shell" id="stockChartShell"></div>
+                                    <div class="chart-axis-labels">
+                                        <span id="stockChartStartDate">--</span>
+                                        <span id="stockChartMinValue">最低 --</span>
+                                        <span id="stockChartMaxValue">最高 --</span>
+                                        <span id="stockChartEndDate">--</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="data-card favorite-dashboard-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">自选股分析</h2>
+                                <p class="section-meta" id="favoriteDashboardMeta">展示当前自选股快照、涨跌分布以及成交量成交额统计。</p>
+                            </div>
+                        </div>
+                        <div class="favorite-dashboard-grid">
+                            <div class="favorite-snapshot-panel">
+                                <h3>自选股快照</h3>
+                                <div class="table-wrapper">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>代码</th>
+                                                <th>名称</th>
+                                                <th>最新价</th>
+                                                <th>涨跌幅</th>
+                                                <th>成交量</th>
+                                                <th>成交额</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="favoriteSnapshotBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="favorite-pie-panel">
+                                <h3>自选股涨跌饼图</h3>
+                                <div class="chart-shell pie-shell" id="favoritePieShell"></div>
+                            </div>
+                            <div class="favorite-bar-panel">
+                                <h3>自选股成交量成交额柱状图</h3>
+                                <div class="chart-shell" id="favoriteBarsShell"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="data-card stock-ranking-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">个股涨跌幅排行榜</h2>
+                                <p class="section-meta" id="stockRankingMeta">展示当前市场涨跌幅排名靠前的股票。</p>
+                            </div>
+                        </div>
+                        <div class="stock-ranking-grid">
+                            <div class="ranking-panel">
+                                <h3>涨幅榜</h3>
+                                <div class="ranking-list" id="stockGainersList"></div>
+                            </div>
+                            <div class="ranking-panel">
+                                <h3>跌幅榜</h3>
+                                <div class="ranking-list" id="stockLosersList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ====================== 个股分析报告生成 ====================== -->
+            <section class="panel" id="stockReportPanel">
+                <div class="content-card analysis-wide-page">
+                    <h1>个股分析报告生成</h1>
+                    <div class="stock-panel-layout report-page-layout">
+                        <div class="stock-report-column">
+                            <div class="data-card">
+                                <div class="section-head">
+                                    <div>
+                                        <h2 class="section-title">个股分析报告生成</h2>
+                                    </div>
+                                </div>
+                                <div class="input-section">
+                                    <input type="text" id="stockCodeInput" placeholder="请输入一个或多个股票代码，例如：600000 000001">
+                                    <select id="favoriteStockSelect">
+                                        <option value="">从自选股中选择</option>
+                                    </select>
+                                    <button id="sendReportBtn">发送报告</button>
+                                </div>
+                                <div class="analysis-progress" id="analysisProgress" style="display:none;">
+                                    <div class="analysis-spinner"></div>
+                                    <div class="analysis-progress-text" id="analysisProgressText">正在生成 LLM 报告...</div>
+                                </div>
+
+                                <div class="predict-result" id="predictResult">
+                                    <h4>股票涨跌预测结果</h4>
+                                    <div id="predictResultContent"></div>
+                                </div>
+
+                                <div class="report-result report-result-full" id="reportResult">
+                                    <h4>报告发送结果</h4>
+                                    <div id="reportResultContent"></div>
+                                </div>
+
+                                <div class="report-result" id="historyReportResult">
+                                    <h4>历史报告</h4>
+                                    <div id="historyReportContent"></div>
+                                </div>
+                            </div>
+
+                            <div class="settings-card analysis-config-card">
+                                <div class="section-head">
+                                    <div>
+                                        <h2 class="section-title">分析设置</h2>
+                                    </div>
+                                </div>
+                                <div class="predict-menu-section">
+                                    <div class="predict-menu-title">预测周期</div>
+                                    <div class="predict-day-options">
+                                        <button type="button" class="predict-day-option active" data-days="1">1天</button>
+                                        <button type="button" class="predict-day-option" data-days="3">3天</button>
+                                        <button type="button" class="predict-day-option" data-days="7">7天</button>
+                                        <button type="button" class="predict-day-option" data-days="30">30天</button>
+                                        <button type="button" class="predict-day-option" data-days="60">60天</button>
+                                        <button type="button" class="predict-day-option" data-days="90">90天</button>
+                                        <button type="button" class="predict-day-option" data-days="120">120天</button>
+                                        <button type="button" class="predict-day-option" data-days="180">180天</button>
+                                        <div class="predict-custom-days inline">
+                                            <label for="predictCustomDaysInput">自定义</label>
+                                            <input type="number" id="predictCustomDaysInput" min="1" max="365" step="1" placeholder="1-365天">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="predict-menu-section">
+                                    <div class="predict-menu-title">启用算法</div>
+                                    <div class="analysis-switch-grid">
+                                        <label class="analysis-switch-row"><span>MA 均线</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="ma" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>RSI</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="rsi" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>MACD</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="macd" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>ARIMA</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="arima" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>XGBoost</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="xgboost" checked><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>趋势判断</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="trend"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>Bollinger Bands</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="bollinger_bands"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>ADX</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="adx"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>波动率分类</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="volatility_classification"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>Random Forest</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="random_forest"><span class="analysis-switch-slider"></span></span></label>
+                                        <label class="analysis-switch-row"><span>线性回归</span><span class="analysis-switch"><input type="checkbox" class="predict-case-checkbox" value="linear_regression"><span class="analysis-switch-slider"></span></span></label>
+                                    </div>
+                                </div>
+                                <button type="button" class="predict-detail-link" id="predictDetailLink">算法详情说明</button>
+                                <button type="button" class="predict-run-btn" id="predictRunBtn">执行分析</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="historyReportPanel">
+                <div class="content-card">
+                    <h1>历史报告</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">历史报告记录</h2>
+                                <p class="section-meta">查看当前账号历史生成的股票分析报告。</p>
+                            </div>
+                        </div>
+                        <div id="historyReportStandaloneContent"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="sentimentPanel">
+                <div class="content-card">
+                    <h1>舆情分析</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">最新舆情拉取</h2>
+                                <p class="section-meta" id="sentimentMeta">支持查看大盘近 3 小时、板块近 48 小时，以及个股近 7 天的最新舆情。</p>
+                            </div>
+                        </div>
+                        <div class="sentiment-tabs">
+                            <button class="sentiment-tab active" data-sentiment-panel="market">大盘舆情</button>
+                            <button class="sentiment-tab" data-sentiment-panel="sector">板块舆情</button>
+                            <button class="sentiment-tab" data-sentiment-panel="stock">个股舆情</button>
+                        </div>
+
+                        <div class="sentiment-filters" id="sentimentMarketFilters">
+                            <input type="datetime-local" id="sentimentStartTimeInput" step="1">
+                            <input type="datetime-local" id="sentimentEndTimeInput" step="1">
+                            <button id="loadMarketSentimentBtn">获取大盘舆情</button>
+                        </div>
+
+                        <div class="sentiment-filters" id="sentimentSectorFilters" style="display:none;">
+                            <input type="datetime-local" id="sentimentSectorStartTimeInput" step="1">
+                            <input type="datetime-local" id="sentimentSectorEndTimeInput" step="1">
+                            <input type="text" id="sentimentSectorInput" list="sectorOptionsList" placeholder="请输入板块名搜索">
+                            <select id="sentimentSectorSelect" style="display:none;">
+                                <option value="">请选择板块</option>
+                            </select>
+                            <button id="loadSectorSentimentBtn">获取板块舆情</button>
+                        </div>
+
+                        <div class="sentiment-filters" id="sentimentStockFilters" style="display:none;">
+                            <input type="datetime-local" id="sentimentStockStartTimeInput" step="1">
+                            <input type="datetime-local" id="sentimentStockEndTimeInput" step="1">
+                            <input type="text" id="sentimentStockCodeInput" placeholder="请输入一个或多个股票代码，例如：600519 000001">
+                            <select id="sentimentFavoriteStockSelect">
+                                <option value="">从自选股中选择</option>
+                            </select>
+                            <button id="loadAllFavoriteSentimentBtn" class="secondary-btn" type="button">获取全部自选股舆情</button>
+                            <button id="loadStockSentimentBtn">获取个股舆情</button>
+                        </div>
+
+                        <div id="sentimentStatus" class="market-loading">请选择舆情类型后开始拉取最新数据。</div>
+                        <div class="sentiment-list" id="sentimentList" style="display:none;"></div>
+                        <div class="pagination" id="sentimentPagination" style="display:none;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="modelInfoPanel">
+                <div class="content-card">
+                    <h1>模型说明</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">分析模块速览</h2>
+                            </div>
+                        </div>
+                        <div class="model-info-shell">
+                            <div class="model-info-overview">
+                                <div class="model-info-overview-item">
+                                    <span class="model-info-overview-label">输入</span>
+                                    <strong>历史行情</strong>
+                                    <p>价格、成交量、涨跌幅与波动特征</p>
+                                </div>
+                                <div class="model-info-overview-item">
+                                    <span class="model-info-overview-label">处理</span>
+                                    <strong>多模型分析</strong>
+                                    <p>技术指标、时序预测、机器学习互相补充</p>
+                                </div>
+                                <div class="model-info-overview-item">
+                                    <span class="model-info-overview-label">输出</span>
+                                    <strong>趋势信号</strong>
+                                    <p>方向倾向、风险解释与报告依据</p>
+                                </div>
+                            </div>
+                            <div class="model-info-workbench">
+                                <div class="model-info-sidebar" id="modelInfoNav"></div>
+                                <div class="model-info-main">
+                                    <div class="model-info-page" id="modelInfoPage"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="settingsPanel">
+                <div class="content-card">
+                    <h1>设置</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">用户设置</h2>
+                                <p class="section-meta">管理账号资料、报告邮箱、自选股和个性化分析偏好。</p>
+                            </div>
+                        </div>
+                        <div class="settings-card profile-settings-card">
+                            <label class="settings-label" for="profileUsernameInput">账号与头像</label>
+                            <div class="profile-settings-layout">
+                                <div class="profile-avatar-preview" id="profileAvatarPreview">--</div>
+                                <div class="profile-settings-fields">
+                                    <div class="settings-form">
+                                        <input type="text" id="profileUsernameInput" placeholder="请输入新的用户名">
+                                        <input type="file" id="profileAvatarInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
+                                        <button id="saveProfileBtn">保存资料</button>
+                                    </div>
+                                    <div id="profileStatus" class="settings-status">正在读取用户资料...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="settings-card">
+                            <label class="settings-label" for="reportEmailInput">接收报告邮箱</label>
+                            <div class="settings-form">
+                                <input type="text" id="reportEmailInput" placeholder="请输入邮箱，例如：example@qq.com">
+                                <button id="saveReportEmailBtn">保存邮箱</button>
+                            </div>
+                            <p class="settings-tip">建议填写常用邮箱，后续报告导出或发送功能会优先使用这里的地址。</p>
+                            <div id="reportEmailStatus" class="settings-status">正在读取当前邮箱设置...</div>
+                        </div>
+                        <div class="settings-card">
+                            <label class="settings-label" for="riskPreferenceSlider">风险偏好</label>
+                            <div class="risk-preference-card">
+                                <div class="risk-preference-header">
+                                    <span class="risk-preference-side risk-preference-side-left">激进</span>
+                                    <span class="risk-preference-current" id="riskPreferenceValue">当前：平和</span>
+                                    <span class="risk-preference-side risk-preference-side-right">保守</span>
+                                </div>
+                                <div class="risk-slider" id="riskPreferenceSlider" role="slider" aria-valuemin="1" aria-valuemax="5" aria-valuenow="3" aria-label="风险偏好">
+                                    <div class="risk-slider-track"></div>
+                                    <button type="button" class="risk-point risk-point-1" data-level="1" aria-label="激进"></button>
+                                    <button type="button" class="risk-point risk-point-2" data-level="2" aria-label="偏激进"></button>
+                                    <button type="button" class="risk-point risk-point-3" data-level="3" aria-label="平和"></button>
+                                    <button type="button" class="risk-point risk-point-4" data-level="4" aria-label="偏保守"></button>
+                                    <button type="button" class="risk-point risk-point-5" data-level="5" aria-label="保守"></button>
+                                    <div class="risk-slider-thumb" id="riskPreferenceThumb"></div>
+                                </div>
+                                <div class="risk-preference-labels">
+                                    <span>激进</span>
+                                    <span>偏激进</span>
+                                    <span>平和</span>
+                                    <span>偏保守</span>
+                                    <span>保守</span>
+                                </div>
+                            </div>
+                            <p class="settings-tip">拖动或点击圆点设置偏好。左侧更偏进攻，右侧更偏稳健，中间代表平衡风格。</p>
+                        </div>
+                        <div class="settings-card">
+                            <label class="settings-label" for="settingsAddStockCodeInput">管理我的自选股</label>
+                            <div class="settings-form">
+                                <input type="text" id="settingsAddStockCodeInput" placeholder="输入股票代码（可选）">
+                                <input type="text" id="settingsAddStockNameInput" placeholder="输入股票名称（可选）">
+                                <button id="settingsAddStockBtn">添加自选股</button>
+                            </div>
+                            <p class="settings-tip">代码或名称至少填写一项；系统会自动补全另一个字段。这里集中管理自选股，个股分析和个股舆情中只做选择。</p>
+                            <div id="settingsStockAlert" style="display:none;"></div>
+                            <button class="stock-fold-toggle" id="settingsStockToggleBtn" type="button" aria-expanded="false">
+                                <span>已有自选股</span>
+                                <span class="stock-fold-toggle-meta" id="settingsStockToggleMeta">点击展开</span>
+                            </button>
+                            <div class="stock-list collapsed" id="settingsStockList">
+                                <p class="tip" id="settingsEmptyTip">暂无自选股，添加后可在个股分析和舆情分析中直接选择。</p>
+                            </div>
+                        </div>
+                        <div class="settings-card">
+                            <label class="settings-label" for="llmSystemPromptInput">LLM System Prompt</label>
+                            <textarea id="llmSystemPromptInput" class="settings-textarea" placeholder="请输入 System Prompt"></textarea>
+                            <label class="settings-label settings-label-inline" for="llmUserPromptInput">LLM User Prompt</label>
+                            <textarea id="llmUserPromptInput" class="settings-textarea settings-textarea-large" placeholder="请输入 User Prompt 模板"></textarea>
+                            <div class="settings-form settings-form-compact">
+                                <button id="saveLlmPromptsBtn">保存 Prompt</button>
+                            </div>
+                            <p class="settings-tip">可用变量：{% raw %}{{stock_name}} 股票名、{{stock_code}} 股票代码、{{predict_days}} 预测天数、{{sector_name}} 板块名、{{generated_at}} 生成时间、{{analysis_json}} 分析数据、{{market_sentiment_titles}} 大盘舆情、{{stock_sentiment_titles}} 个股舆情{% endraw %}</p>
+                            <div id="llmPromptStatus" class="settings-status">正在读取 LLM Prompt 设置...</div>
+                        </div>
+                        <div class="settings-card">
+                            <label class="settings-label">定时发送分析报告</label>
+                            <div class="schedule-settings-grid">
+                                <label class="analysis-switch-row schedule-toggle-row">
+                                    <span>开启定时发送</span>
+                                    <span class="analysis-switch">
+                                        <input type="checkbox" id="reportScheduleEnabledInput">
+                                        <span class="analysis-switch-slider"></span>
+                                    </span>
+                                </label>
+                                <div class="schedule-time-block">
+                                    <label class="settings-label settings-label-inline" for="reportScheduleTimeInput">发送时间（24 小时制）</label>
+                                    <div class="settings-form">
+                                        <input type="time" id="reportScheduleTimeInput" value="09:00">
+                                    </div>
+                                </div>
+                            </div>
+                            <label class="settings-label settings-label-inline">选择发送股票</label>
+                            <div class="schedule-stock-picker" id="reportScheduleStockList">
+                                <p class="tip">请先在上方“管理我的自选股”中添加股票。</p>
+                            </div>
+                            <div class="settings-form settings-form-compact">
+                                <button id="saveReportScheduleBtn">保存定时设置</button>
+                            </div>
+                            <p class="settings-tip">系统会在你设定的时间，向当前保存邮箱发送所选自选股的 7 天分析报告。若未开启，系统不会自动发送。</p>
+                            <div id="reportScheduleStatus" class="settings-status">正在读取定时发送设置...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="userManagePanel">
+                <div class="content-card">
+                    <h1>用户管理</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">审核注册用户</h2>
+                            </div>
+                        </div>
+                        <div class="settings-card" id="adminUsersCard" style="display:none;">
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>UUID</th>
+                                            <th>账号</th>
+                                            <th>邮箱</th>
+                                            <th>权限</th>
+                                            <th>状态</th>
+                                            <th>Token消耗</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="adminUsersBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="forumPanel">
+                <div class="content-card forum-page-card">
+                    <h1>论坛</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">交流广场</h2>
+                                <p class="section-meta" id="forumMeta">这里可以记录盘中观察、板块想法和个股观点，按时间倒序展示最新帖子。</p>
+                            </div>
+                        </div>
+                        <div class="sentiment-tabs forum-tabs">
+                            <button class="sentiment-tab active forum-tab" type="button" data-forum-panel="feed">交流广场</button>
+                            <button class="sentiment-tab forum-tab" type="button" data-forum-panel="compose">发布帖子</button>
+                        </div>
+                        <div class="forum-layout">
+                            <div class="settings-card forum-compose-card forum-subpanel" id="forumComposePanel">
+                                <label class="settings-label" for="forumPostContent">发布帖子</label>
+                                <p class="settings-tip" id="forumComposerMeta">登录后可直接发帖，系统会自动带上用户名和时间戳。</p>
+                                <textarea id="forumPostContent" class="settings-textarea settings-textarea-large" placeholder="写下你的盘面观察、交易想法或问题..."></textarea>
+                                <div class="settings-form settings-form-compact">
+                                    <input type="file" id="forumImageInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp">
+                                </div>
+                                <div class="forum-image-preview" id="forumImagePreview" style="display:none;">
+                                    <img id="forumImagePreviewImg" alt="帖子图片预览">
+                                </div>
+                                <div class="settings-form settings-form-compact">
+                                    <button id="forumPostSubmitBtn">发布帖子</button>
+                                </div>
+                                <div id="forumStatus" class="settings-status">正在加载论坛帖子...</div>
+                            </div>
+                            <div class="settings-card forum-feed-card forum-subpanel active" id="forumFeedPanel">
+                                <div class="forum-feed-head">
+                                    <label class="settings-label">最新帖子</label>
+                                    <div class="forum-feed-toolbar">
+                                        <select id="forumSortSelect">
+                                            <option value="created_at">按发布时间排序</option>
+                                            <option value="likes">按点赞量排序</option>
+                                            <option value="comments">按评论数排序</option>
+                                        </select>
+                                        <button id="forumRefreshBtn" class="secondary-btn" type="button">刷新列表</button>
+                                    </div>
+                                </div>
+                                <div class="forum-list" id="forumList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" id="aiCustodyPanel">
+                <div class="content-card">
+                    <h1>AI托管</h1>
+                    <div class="data-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">功能预留</h2>
+                                <p class="section-meta">这里将用于后续承载 AI 自动跟踪、自选股托管、策略提醒和定时分析等功能，当前先保留模块入口。</p>
+                            </div>
+                        </div>
+                        <div class="settings-card">
+                            <p class="settings-tip">AI托管模块已预留，后续可以在这里继续扩展自动巡检、事件提醒、日报周报生成、条件触发等功能。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <datalist id="sectorOptionsList"></datalist>
+
+    <script src="{{ url_for('static', filename='js/webmange.js', v='20260504a') }}"></script>
+</body>
+</html>

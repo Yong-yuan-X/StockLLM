@@ -1,0 +1,285 @@
+<div class="report-page">
+    <header class="report-hero">
+        <div>
+            <p class="report-kicker">标准股票分析报告</p>
+            <h1>{{ report.header.stock_name }} {{ report.header.stock_code }}</h1>
+            <p class="report-subtitle">{{ report.header.subtitle }}</p>
+        </div>
+        <div class="report-badge-group">
+            <span class="report-badge">报告日期：{{ report.header.report_date }}</span>
+            <span class="report-badge">周期：{{ report.header.predict_days }} 天</span>
+            <span class="report-badge">版本：{{ report.header.version }}</span>
+        </div>
+    </header>
+
+    <section class="report-ribbon">
+        <div class="ribbon-card ribbon-rating">
+            <span class="ribbon-label">综合评级</span>
+            <strong>{{ report.ribbons.rating_title }}</strong>
+            <p>{{ report.ribbons.rating_desc }}</p>
+        </div>
+        <div class="ribbon-card ribbon-watch">
+            <span class="ribbon-label">重点观察</span>
+            <strong>{{ report.ribbons.watch_title }}</strong>
+            <p>{{ report.ribbons.watch_desc }}</p>
+        </div>
+        <div class="ribbon-card ribbon-risk">
+            <span class="ribbon-label">核心风险</span>
+            <strong>{{ report.ribbons.risk_title }}</strong>
+            <p>{{ report.ribbons.risk_desc }}</p>
+        </div>
+    </section>
+
+    <section class="chapter-nav">
+        <a href="#summary">核心结论</a>
+        <a href="#market-view">走势分析</a>
+        <a href="#metrics">关键指标</a>
+        <a href="#context">市场环境</a>
+        <a href="#sentiment">舆情线索</a>
+        <a href="#ai-brief">AI 摘要</a>
+    </section>
+
+    <section class="summary-grid">
+        <article class="summary-card accent-rise">
+            <span class="summary-label">最新价</span>
+            <strong class="summary-value">{{ report.summary_cards.latest_price or "--" }}</strong>
+            <span class="summary-foot">日内 {{ report.summary_cards.latest_pct_chg if report.summary_cards.latest_pct_chg is not none else "--" }}%</span>
+        </article>
+        <article class="summary-card">
+            <span class="summary-label">区间涨跌幅</span>
+            <strong class="summary-value">{{ report.summary_cards.period_return if report.summary_cards.period_return is not none else "--" }}%</strong>
+            <span class="summary-foot">近 90 个交易日</span>
+        </article>
+        <article class="summary-card">
+            <span class="summary-label">成交额</span>
+            <strong class="summary-value">{{ report.summary_cards.latest_amount }}</strong>
+            <span class="summary-foot">最近交易日</span>
+        </article>
+        <article class="summary-card">
+            <span class="summary-label">相对大盘强弱</span>
+            <strong class="summary-value">{{ report.summary_cards.relative_strength_label or "--" }}</strong>
+            <span class="summary-foot">相对上证指数 {{ report.summary_cards.relative_strength_value if report.summary_cards.relative_strength_value is not none else "--" }}%</span>
+        </article>
+    </section>
+
+    <section class="report-section summary-layout" id="summary">
+        <div class="section-head">
+            <div>
+                <h2>核心结论</h2>
+                <p>先给出一页式判断，便于快速浏览。</p>
+            </div>
+        </div>
+        <div class="executive-grid">
+            <div class="insight-panel">
+                <div class="insight-main">
+                    <h3>结论摘要</h3>
+                    <p>{{ report.conclusion_summary }}</p>
+                </div>
+                <div class="insight-side">
+                    <div class="tag good">{{ report.trend_tag }}</div>
+                    <div class="tag neutral">{{ report.valuation_tag }}</div>
+                    <div class="tag warn">{{ report.action_tag }}</div>
+                </div>
+            </div>
+            <aside class="executive-note">
+                <span class="executive-title">执行摘要</span>
+                <ul>
+                    {% for point in report.executive_points %}
+                    <li>{{ point }}</li>
+                    {% endfor %}
+                </ul>
+            </aside>
+        </div>
+        <div class="callout-grid">
+            <article class="callout positive">
+                <h3>积极信号</h3>
+                <p>{{ report.positive_signals|join(" ") }}</p>
+            </article>
+            <article class="callout neutral">
+                <h3>中性观察</h3>
+                <p>{{ report.neutral_observations|join(" ") }}</p>
+            </article>
+            <article class="callout caution">
+                <h3>谨慎点</h3>
+                <p>{{ report.caution_points|join(" ") }}</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="report-section" id="market-view">
+        <div class="section-band">
+            <span>走势与量价</span>
+            <strong>Price Action</strong>
+        </div>
+    </section>
+
+    <section class="report-section chart-grid chart-grid-stacked">
+        <article class="chart-panel wide spotlight-panel">
+            <div class="spotlight-strip">
+                <span>趋势主图</span>
+                <strong>近 90 个交易日高点 {{ report.summary_cards.period_high or "--" }} / 低点 {{ report.summary_cards.period_low or "--" }}</strong>
+            </div>
+            <div class="section-head">
+                <div>
+                    <h2>股价走势分析</h2>
+                    <p>基于真实开高低收数据绘制的近 60 个交易日 K 线示意。</p>
+                </div>
+            </div>
+            <div class="chart-placeholder">
+                {% if report.charts.price_svg %}
+                {{ report.charts.price_svg|safe }}
+                {% else %}
+                <div class="chart-empty">当前暂无 K 线数据。</div>
+                {% endif %}
+            </div>
+        </article>
+
+        <article class="chart-panel">
+            <div class="section-head">
+                <div>
+                    <h2>成交量变化</h2>
+                    <p>基于最近 30 个交易日真实成交量绘制，最近交易日成交额 {{ report.summary_cards.latest_amount }}。</p>
+                </div>
+            </div>
+            <div class="bars-placeholder">
+                {% if report.charts.volume_svg %}
+                {{ report.charts.volume_svg|safe }}
+                {% else %}
+                <div class="chart-empty">当前暂无成交量数据。</div>
+                {% endif %}
+            </div>
+        </article>
+
+        <article class="chart-panel">
+            <div class="section-head">
+                <div>
+                    <h2>相对大盘对比</h2>
+                    <p>基于真实收盘价计算的个股与上证指数归一化走势对比。</p>
+                </div>
+            </div>
+            <div class="mini-compare">
+                {% if report.charts.compare_svg %}
+                {{ report.charts.compare_svg|safe }}
+                {% else %}
+                <div class="chart-empty">当前暂无对比数据。</div>
+                {% endif %}
+                <div class="compare-row">
+                    <span>个股</span>
+                    <div class="compare-bar"><i style="width: 78%"></i></div>
+                    <strong>{{ report.summary_cards.period_return if report.summary_cards.period_return is not none else "--" }}%</strong>
+                </div>
+                <div class="compare-row">
+                    <span>相对强弱</span>
+                    <div class="compare-bar muted"><i style="width: 41%"></i></div>
+                    <strong>{{ report.summary_cards.relative_strength_value if report.summary_cards.relative_strength_value is not none else "--" }}%</strong>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="report-section" id="metrics">
+        <div class="section-band metrics-band">
+            <span>规则指标</span>
+            <strong>Quant Signals</strong>
+        </div>
+        <div class="section-head">
+            <div>
+                <h2>关键指标分析</h2>
+                <p>这一块直接填入规则分析和模型输出。</p>
+            </div>
+        </div>
+        <div class="metrics-table-wrap">
+            <table class="metrics-table">
+                <thead>
+                    <tr>
+                        <th>指标</th>
+                        <th>当前值</th>
+                        <th>参考解读</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report.metrics_rows %}
+                    <tr>
+                        <td>{{ row.indicator }}</td>
+                        <td>{{ row.current_value }}</td>
+                        <td>{{ row.interpretation }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="report-section dual-column" id="context">
+        <article class="content-panel">
+            <div class="section-head">
+                <div>
+                    <h2>板块与市场环境</h2>
+                    <p>把个股放回所属板块和市场环境中理解。</p>
+                </div>
+            </div>
+            <ul class="bullet-list">
+                {% for point in report.market_context_points %}
+                <li>{{ point }}</li>
+                {% endfor %}
+            </ul>
+        </article>
+
+        <article class="content-panel">
+            <div class="section-head">
+                <div>
+                    <h2>风险提示</h2>
+                    <p>报告里必须单独列出，避免只有乐观结论。</p>
+                </div>
+            </div>
+            <ul class="bullet-list risk">
+                {% for point in report.risk_points %}
+                <li>{{ point }}</li>
+                {% endfor %}
+            </ul>
+        </article>
+    </section>
+
+    <section class="report-section" id="sentiment">
+        <div class="section-band metrics-band">
+            <span>舆情线索</span>
+            <strong>Sentiment Headlines</strong>
+        </div>
+        <div class="sentiment-report-grid">
+            {% for section in report.sentiment_sections %}
+            <article class="content-panel">
+                <div class="section-head">
+                    <div>
+                        <h2>{{ section["title"] }}</h2>
+                        <p>{{ section["subtitle"] }}</p>
+                    </div>
+                </div>
+                <ul class="bullet-list">
+                    {% for item in section["items"] %}
+                    <li>{{ item }}</li>
+                    {% else %}
+                    <li>当前没有可展示的标题。</li>
+                    {% endfor %}
+                </ul>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="report-section" id="ai-brief">
+        <div class="section-band ai-band">
+            <span>模型解读</span>
+            <strong>AI Insight</strong>
+        </div>
+        <div class="section-head">
+            <div>
+                <h2>AI 分析摘要</h2>
+                <p>这一段由结构化数据和标题级舆情共同生成。</p>
+            </div>
+        </div>
+        <div class="ai-summary">
+            <p>{{ report.ai_summary }}</p>
+        </div>
+    </section>
+
+</div>

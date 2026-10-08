@@ -1,0 +1,22 @@
+services:
+  app:
+    image: ${APP_IMAGE:-stockllm:latest}
+    container_name: stockllm-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      FLASK_DEBUG: "false"
+      PORT: "8000"
+      DATABASE_PATH: "/app/stock.db"
+    volumes:
+      - ${HOST_RUNTIME_DIR:-./runtime}:/app/runtime
+      - ${HOST_DATABASE_PATH:-./stock.db}:/app/stock.db
+    ports:
+      - "127.0.0.1:${STOCKLLM_PORT:-5001}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

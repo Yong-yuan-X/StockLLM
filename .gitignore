@@ -1,0 +1,44 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+certs/
+
+# IDE / OS files
+.DS_Store
+.vscode/
+.idea/
+
+# Local database
+stock.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime data and generated artifacts
+runtime/
+sentiment/cache/
+data/
+diagrams/
+paper/
+*.drawio
+
+# Common Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
