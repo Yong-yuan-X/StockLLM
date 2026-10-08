@@ -166,36 +166,6 @@ StockLLM 是一个面向 A 股场景的本地化股票分析与报告生成系�
 
 大盘分析与个股分析共用大部分分析框架。系统会先输出结构化分析结果，再结合舆情上下文生成面向展示的报告内容。
 
-## 技术栈
-
-后端：
-
-- Flask
-- SQLite
-- Pandas
-- Requests
-- AkShare
-- OpenAI SDK 兼容调用
-- SMTP
-
-机器学习与指标分析：
-
-- scikit-learn
-- XGBoost
-- ARIMA/时间序列分析逻辑
-- 多种技术指标与规则融合
-
-前端：
-
-- Jinja2 模板
-- HTML / CSS / 原生 JavaScript
-
-已接入或预留的模型提供方：
-
-- 豆包调用：`ai/doubao_helper.py`
-- GPT调用：`ai/gpt_helper.py`
-- 千问调用：`ai/qwen_helper.py`
-- 小米 MiMo 调用：`ai/xiaomi_helper.py`
 
 ## 项目结构
 
@@ -237,7 +207,8 @@ cp .env.example .env
 
 - `ADMIN_PASSWORD`：管理员密码，未配置时应用会拒绝启动
 - `FLASK_SECRET_KEY`：用于签名登录会话、长度至少 32 个字符的随机字符串
-- 当前选择的模型提供方 API Key
+
+如需使用 LLM 报告生成功能，还需要配置当前所选模型提供方的 API Key。仅预览界面或使用非 AI 功能时，可以留空模型 API Key，并将 `ENABLE_REPORT_SCHEDULER` 设为 `false`。
 
 HTTPS 部署时还应将 `SESSION_COOKIE_SECURE` 设为 `true`。请勿把 `.env`、数据库、证书、上传文件或运行时缓存提交到仓库。
 
@@ -342,6 +313,17 @@ python app.py
 - 论坛
 - 设置
 
+## 界面预览
+
+### 舆情界面
+
+
+
+
+### 分析报告
+
+
+
 ## 开发提示
 
 - Flask Debug 默认关闭，仅应在受控的本地开发环境通过 `FLASK_DEBUG=true` 临时启用
@@ -354,17 +336,21 @@ python app.py
 
 - Docker Compose 会把数据库与 `runtime/` 挂载到宿主机，生产环境应自行设置目录权限、备份与 TLS 证书。
 - 仓库不包含会自动执行的生产部署工作流。`docs/deploy.example.yml` 仅是未启用的手动部署示例，不会被 GitHub Actions 自动加载。
-- 如需启用示例，应先移入 `.github/workflows/`，逐项审核，并为 `production` Environment 配置审批保护、`CONTAINER_REGISTRY`、`APP_IMAGE_REPOSITORY` 两个 Variables，以及示例中列出的 Secrets。
-- `ENABLE_TEST_ENDPOINTS` 和 `ENABLE_SENTIMENT_DEBUG` 默认关闭，不应在公网环境开启。
+- 如需启用示例，应先移入 `.github/workflows/`，逐项审核，并为 `production` Environment 配置审批保护、`CONTAINER_REGISTRY`、`APP_IMAGE_REPOSITORY` 两个 Variables，以及示例中列出的 Secrets
+- `ENABLE_TEST_ENDPOINTS` 和 `ENABLE_SENTIMENT_DEBUG` 默认关闭，不应在公网环境开启
 
 ## 数据来源与许可
 
-项目依赖包分别遵循其自身许可证；当前 Python 依赖采用 MIT、BSD 或 Apache-2.0 等宽松许可证。行情与舆情数据来自第三方公开接口，其可用性、准确性和使用条件由相应数据提供方决定，使用者应自行确认适用条款。
+项目依赖包分别遵循其自身许可证；当前 Python 依赖采用 MIT、BSD 或 Apache-2.0 等宽松许可证。行情与舆情数据来自第三方公开接口，其可用性、准确性和使用条件由相应数据提供方决定，使用者应自行确认适用条款
 
 ## 免责声明
 
-本项目提供的行情、舆情、指标分析与 LLM 生成内容仅供学习、研究和信息参考，不构成任何投资建议。市场数据与模型输出可能存在延迟、遗漏或错误，使用者应独立判断并自行承担投资风险。本软件按“现状”提供，不保证可用性、准确性或适合生产环境。
+本项目提供的行情、舆情、指标分析与 LLM 生成内容仅供学习、研究和信息参考，不构成任何投资建议。市场数据与模型输出可能存在延迟、遗漏或错误，使用者应独立判断并自行承担投资风险。本软件按“现状”提供，不保证可用性、准确性或适合生产环境
 
 ## 许可证
 
-项目代码及仓库内原创素材采用 [MIT License](LICENSE) 发布。第三方依赖和外部数据不包含在该授权范围内，并继续适用其各自条款。
+项目代码及仓库内原创素材采用 [MIT License](LICENSE) 发布。第三方依赖和外部数据不包含在该授权范围内，并继续适用其各自条款
+
+## 参与贡献
+
+提交问题或改进前，请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)
